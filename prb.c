@@ -28,87 +28,49 @@ struct node {
 
 NODE node[ N_MAX_NODE ];
 
-void getChild( int node_number )
+int find_min_prob_nodes(int max_node, int exclude_node)
 {
-
-    strcmp( node[node_number].sym, "\0" );
-    node[node_number].parent = -1;
-    node[node_number].code = -1;
-
-    int i,count = 0;
-
-    unsigned int first = 999999;
-    unsigned int second = 999999;
-
-    double prob0, prob1, prob2 = 0.0;
-
-    prob0 = prob1 = 9.9999;
-    
-    for( i=0; i<node_number; i++ )
+  int id_min = -1;
+  for (int i_node = 0; i_node < max_node; i_node++)
+  {
+    if (i_node != exclude_node && node[i_node].parent == -1)
     {
-        if( node[i].parent == -1 )
-        {
-            if( first > node[i].prob && second > node[i].prob )
-            {
-                first = node[i].prob;
-                node[i].parent = node_number;
-                node[i].code = 0;
-                node[node_number].child_0 = i;
-                prob0 = node[i].prob;
-            //    printf("%f\n",node[i].prob);
-            }
-            else if( second > node[i].prob )
-            {
-                second = node[i].prob;
-                node[i].parent = node_number;
-                node[i].code = 1;
-                node[node_number].child_1 = i;
-                prob1 = node[i].prob;
-            //    printf("%f\n",node[i].prob);
-            }
-        }
+      if (id_min == -1) id_min = i_node;
+      if (node[i_node].prob < node[id_min].prob) id_min = i_node;
     }
-
-    prob2 = prob0 + prob1;
-    printf("%f\n", prob2);
-    node[node_number].prob =  prob2; 
-  //  printf("%f\n",node[node_number].prob);
-
-} 
+  }
+  return id_min;
+}
 
 void makeHuffmanTree()
 {
     int i, counter = 0;
     int node_counter = 257;
+    int left, right;
+    left = right = -1;
 
-    while( 1 )
+    for (int i_node = N_SYM; i_node < N_MAX_NODE; i_node++)
     {
-        int counter = 0;
-
-
-        for( i=0; i<N_MAX_NODE+1; i++ )if(node[i].parent == -1)counter++;
-        if( counter == 1 )break;
-        printf("ok%d\n",counter);
-        printf("oknode%d\n",node_counter);
-
-    //    getChild( node_counter );
-
-        getChild( node_counter );
-        node_counter++;
-
-        //if(node_counter == 512)break;
+        right = find_min_prob_nodes(i_node, -1);
+        left = find_min_prob_nodes(i_node, right);
+        node[i_node].child_0 = right;
+        node[i_node].child_1 = left;
+        node[i_node].prob = node[right].prob + node[left].prob;
+        strcpy(node[i_node].sym, "\0");
+        node[right].parent = i_node;
+        node[left].parent = i_node;
+        node[right].code = 0;
+        node[left].code = 1;
     }
-
 }
 
 int main( int argc, char *argv[] )
 {
-    char filename[256];
     double prob;
+    double ave_len = 0.0;
     char sym[ CMAX ];
-    int i, j;
-
-    
+    int i;
+  
     FILE *fpr, *fpw;
 
     if( ( fpr = fopen( argv[1], "r" ) ) == NULL )
@@ -117,8 +79,7 @@ int main( int argc, char *argv[] )
         exit( 1 );
     }
 
-
-    for( i=0; i<CMAX; i++ )
+    for( i=0; i<N_MAX_NODE; i++ )
     {
         node[i].parent = node[i].child_0 = node[i].child_1 = node[i].code = -1;
     }
@@ -140,7 +101,6 @@ int main( int argc, char *argv[] )
     } 
 
     makeHuffmanTree();
- //   printf("ok\n");
 
     if( ( fpw = fopen( argv[2], "w" ) ) == NULL )
     {
@@ -148,28 +108,23 @@ int main( int argc, char *argv[] )
         exit( 1 );
     }
 
-    for( i=0; i<CMAX+1; i++ )
+    for( i=0; i<257; i++ )
     {
-        char hcode[N_MAX_CODE_LEN];
+        char hcode[N_MAX_CODE_LEN] = "\0";
         hcode[0] = '\0';
-        int count;
-        char tmp[N_MAX_CODE_LEN];
-        count = i;
+        int count = i;
 
-
-        while( 1 )
+        // get_hcode
+        while(1)
         {
-            if( node[count].code == -1 )break;
-//            printf("%d",node[count].code);
-            strcpy( tmp, hcode );
-            sprintf( hcode, "%d%s",  node[count].code, tmp );
-            count = node[count].parent;
-        //    printf( "%s", node[count].sym );
-        //    printf( "%9.8f ",node[count].prob );
-        //    printf("\n");
+            if( node[count].parent == -1 )break;
+                char copy[N_MAX_CODE_LEN];
+                strcpy(copy, hcode);
+                sprintf( hcode, "%d%s",  node[count].code, copy );
+                count = node[count].parent;
         }
-        for( i=0;i<512;i++)
-        {
+
+/* 
         printf("%d",i);
         printf( "%s:", node[i].sym );
         printf( "%f:",node[i].prob );
@@ -179,10 +134,15 @@ int main( int argc, char *argv[] )
         printf("child1=%d:",node[i].child_1 ); 
         printf("%s",hcode);
         printf("\n");
-        }
-        fprintf( fpw, "# %3d %s %9.8f %s\n", i, node[i].sym, node[i].prob, hcode );
+*/        
+        int code_len = strlen(hcode);
+        
+        fprintf( fpw, "# %3d %s %.8f %5d %s\n", i, node[i].sym, node[i].prob, code_len, hcode );
+        ave_len += code_len * node[i].prob;
     }
-
+  
+    fprintf( fpw, "average code length = %14.8f\n", ave_len);
+    fprintf( fpw, "compression rate = %14.8f [%%] (ave_len/8)\n", 100 * ave_len / 8.0);
     fclose( fpr );
     fclose( fpw );
 
